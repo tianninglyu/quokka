@@ -1,0 +1,47 @@
+# Example input for MHDTurbulenceConst (3D, periodic, dimensionless constants units)
+
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 1.0 1.0 1.0
+quokka.bc = periodic periodic periodic
+
+amr.v = 3
+
+amr.n_cell = 512 512 512
+amr.max_level = 0
+amr.blocking_factor = 128
+amr.max_grid_size = 256
+
+stop_time = 4.0
+plottime_interval = 0.5
+checkpointtime_interval = 0.5
+max_timesteps = 200000
+density_floor = 1e-6
+
+hydro.cfl = 0.4
+hydro.reconstruction_order = 2
+hydro.plm_limiter = "minmod"
+hydro.artificial_viscosity_coefficient = 0.0
+
+mhd.reconstruction_order = 2
+mhd.plm_limiter = "minmod"
+mhd.project_initial_b_field = 1
+
+# Problem-specific parameters (runtime-configurable)
+mhdturb.rho0 = 1.0
+mhdturb.scalar0 = 1.0
+mhdturb.B0 = 0.0 0.0 1.0   # dimensionless Bx, By, Bz
+
+# Turbulence driving parameters (Federrath OU driver)
+turbulence.enabled = 1
+turbulence.length = 1.0
+turbulence.target_vdisp = 1.0
+turbulence.ampl_factor = 0.5
+turbulence.ampl_auto_adjust = 1
+turbulence.k_driv = 2.0
+turbulence.k_min = 1.0
+turbulence.k_max = 3.0
+turbulence.sol_weight = 0.5
+turbulence.spect_form = 1
+turbulence.angles_exp = 2.0
+turbulence.random_seed = 2026
+turbulence.nsteps_per_t_turb = 10
