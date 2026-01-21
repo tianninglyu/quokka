@@ -99,16 +99,8 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE auto HLL3R(quokka::HydroState<N_scalars, N_m
 	const double E_star_L = rho_star_L * e_star_L + 0.5 * rho_star_L * (S_star * S_star + sL.v * sL.v + sL.w * sL.w);
 	const double E_star_R = rho_star_R * e_star_R + 0.5 * rho_star_R * (S_star * S_star + sR.v * sR.v + sR.w * sR.w);
 
-	// Auxiliary internal energy (Eint) for dual energy formalism:
-	// IMPORTANT: Eint_star must be CONSISTENT with the internal energy used in E_star!
-	// The star-state specific internal energy e_star is computed from the 3rd Riemann invariant
-	// (BKW10 Eqn. 3.2), which includes pressure work: e* = e + (P*² - P²)/(2c²).
-	// Using scalar advection jump condition (Eint* = Eint*(S-u)/(S-u*)) would be INCONSISTENT
-	// because it ignores pressure work, leading to numerical oscillations in high-Mach flows
-	// when the dual energy sync attempts to reconcile two conflicting internal energy values.
-	// Instead, we must use: Eint* = rho* * e* (internal energy density = density × specific internal energy)
-	const double Eint_star_L = rho_star_L * e_star_L;
-	const double Eint_star_R = rho_star_R * e_star_R;
+	const double Eint_star_L = sL.Eint * (rho_star_L / sL.rho);
+	const double Eint_star_R = sR.Eint * (rho_star_R / sR.rho);
 
 	/// Compute fluxes using jump conditions
 	// For HLL3R, we compute the star state explicitly and then use the Rankine-Hugoniot
