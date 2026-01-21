@@ -1422,6 +1422,8 @@ void HydroSystem<problem_t>::ComputeFluxes(amrex::MultiFab &x1Flux_mf, amrex::Mu
 
 		F_canonical = F_canonical + viscosity * (U_L - U_R);
 
+		F = F_canonical;
+		
 		// permute momentum components according to flux direction DIR
 		F[velN_index] = F_canonical[x1Momentum_index];
 		F[velV_index] = F_canonical[x2Momentum_index];
