@@ -27,6 +27,7 @@
 // internal headers
 #include "EOS.hpp"
 #include "HLLC.hpp"
+#include "HLL3R.hpp"
 #include "HLLD.hpp"
 #include "LLF.hpp"
 #include "LLF_mhd.hpp"
@@ -53,7 +54,7 @@ template <typename T> struct dependent_false : std::false_type {
 };
 template <typename T> inline constexpr bool dependent_false_v = dependent_false<T>::value;
 
-enum class RiemannSolver { HLLC, LLF, LLF_MHD, HLLD };
+enum class RiemannSolver { HLLC, HLL3R, LLF, LLF_MHD, HLLD };
 
 /// Class for the Euler equations of inviscid hydrodynamics
 ///
@@ -1392,6 +1393,9 @@ void HydroSystem<problem_t>::ComputeFluxes(amrex::MultiFab &x1Flux_mf, amrex::Mu
 		if constexpr (RIEMANN == RiemannSolver::HLLC) {
 			static_assert(!Physics_Traits<problem_t>::is_mhd_enabled, "Cannot use HLLC solver for MHD problems!");
 			F_canonical = quokka::Riemann::HLLC<problem_t, nscalars_, nmscalars_, nHydroScalars_>(sL, sR, gamma_, du, dw);
+		} else if constexpr (RIEMANN == RiemannSolver::HLL3R) {
+			static_assert(!Physics_Traits<problem_t>::is_mhd_enabled, "Cannot use HLL3R solver for MHD problems!");
+			F_canonical = quokka::Riemann::HLL3R<problem_t, nscalars_, nmscalars_, nHydroScalars_>(sL, sR, gamma_, du, dw);
 		} else if constexpr (RIEMANN == RiemannSolver::LLF) {
 			F_canonical = quokka::Riemann::LLF<problem_t, nscalars_, nmscalars_, nHydroScalars_>(sL, sR);
 		} else if constexpr (RIEMANN == RiemannSolver::LLF_MHD) {

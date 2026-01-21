@@ -2800,7 +2800,10 @@ void QuokkaSimulation<problem_t>::hydroFluxFunction(amrex::MultiFab &primVar_mf,
 											 rightState_bfield, primVar_mf, artificialViscosityK_, &x1FSpds,
 											 &consVar_fc[static_cast<int>(DIR)], nghost_Riemann);
 	} else {
-		HydroSystem<problem_t>::template ComputeFluxes<RiemannSolver::HLLC, DIR>(flux, faceVel, leftState, rightState, leftState_bfield,
+		/*HydroSystem<problem_t>::template ComputeFluxes<RiemannSolver::HLLC, DIR>(flux, faceVel, leftState, rightState, leftState_bfield,
+											 rightState_bfield, primVar_mf, artificialViscosityK_, nullptr, nullptr,
+											 nghost_Riemann);*/
+		HydroSystem<problem_t>::template ComputeFluxes<RiemannSolver::HLL3R, DIR>(flux, faceVel, leftState, rightState, leftState_bfield,
 											 rightState_bfield, primVar_mf, artificialViscosityK_, nullptr, nullptr,
 											 nghost_Riemann);
 	}
