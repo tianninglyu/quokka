@@ -5,6 +5,8 @@
 #include "AMReX_GpuQualifiers.H"
 #include <AMReX.H>
 #include <AMReX_REAL.H>
+#include <algorithm>
+#include <limits>
 
 #include "hydro/EOS.hpp"
 #include "hydro/HydroState.hpp"
@@ -41,7 +43,7 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE auto HLL3R(quokka::HydroState<N_scalars, N_m
 		auto [dedr_R, dedp_R, drdp_R, dpdr_s_R, G_R] = quokka::EOS<problem_t>::ComputeOtherDerivatives(sR.rho, sR.P, sR.massScalar);
 
 		// BKW10, Eq.(3.14)(3.34)(3.36)
-		// In hydro case, a_q = a^0 = sqrt(dp/drho|_s), the Lagrangian sound speed
+		// In hydro case, a_q = a^0 = sqrt(dp/drho|_s)
 		const double a_L = std::sqrt(std::max(0.0, dpdr_s_L));
 		const double a_R = std::sqrt(std::max(0.0, dpdr_s_R));
 
@@ -72,18 +74,24 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE auto HLL3R(quokka::HydroState<N_scalars, N_m
 	// Compute density in star left/right states
 	// BKW10, Eqn.(3.16)
 	// 1/rho*_L = 1/rho_L + (c_R * (-[u]) + [p]) / (c_L * (c_L + c_R))
-	// 1/rho*_R = 1/rho_R + (c_L * [u] + [p]) / (c_R * (c_L + c_R))
-	const double rho_star_L = 1.0 / (1.0 / sL.rho + (c_R * (-dU) + dP) / (c_L * (c_L + c_R)));
-	const double rho_star_R = 1.0 / (1.0 / sR.rho + (c_L * dU + dP) / (c_R * (c_L + c_R)));
+	// 1/rho*_R = 1/rho_R - (c_L * [u] + [p]) / (c_R * (c_L + c_R))
+	const double inv_rho_star_L = 1.0 / sL.rho + (c_R * (-dU) + dP) / (c_L * (c_L + c_R));
+	const double inv_rho_star_R = 1.0 / sR.rho - (c_L * dU + dP) / (c_R * (c_L + c_R));
+	// Protect against negative or zero density with a tiny relative floor to avoid excessive diffusion
+	constexpr double rho_rel_floor = 1.0e-12;
+	const double rho_star_L = 1.0 / std::max(inv_rho_star_L, rho_rel_floor / sL.rho);
+	const double rho_star_R = 1.0 / std::max(inv_rho_star_R, rho_rel_floor / sR.rho);
 
-	// Compute specific internal energy in star left/right states
+	// Compute specific internal energy in star left/right states for TOTAL ENERGY calculation
 	// BKW10, Eqn.(3.2), 3rd Riemann Invariant: e - p^2/(2c^2) = const along contact
 	// e*_L = e_L + (p*^2 - p_L^2) / (2 * c_L^2)
 	// e*_R = e_R + (p*^2 - p_R^2) / (2 * c_R^2)
-	const double e_L = sL.Eint / sL.rho;
-	const double e_R = sR.Eint / sR.rho;
-	const double e_star_L = e_L + (P_star * P_star - sL.P * sL.P) / (2.0 * c_L * c_L);
-	const double e_star_R = e_R + (P_star * P_star - sR.P * sR.P) / (2.0 * c_R * c_R);
+	// Note: For total energy, we use the internal energy derived from pressure (consistent with EOS)
+	const double eint_from_P_L = quokka::EOS<problem_t>::ComputeEintFromPres(sL.rho, sL.P, sL.massScalar) / sL.rho;
+	const double eint_from_P_R = quokka::EOS<problem_t>::ComputeEintFromPres(sR.rho, sR.P, sR.massScalar) / sR.rho;
+	// Protect against negative internal energy in high Mach number flows
+	const double e_star_L = std::max(0.0, eint_from_P_L + (P_star * P_star - sL.P * sL.P) / (2.0 * c_L * c_L));
+	const double e_star_R = std::max(0.0, eint_from_P_R + (P_star * P_star - sR.P * sR.P) / (2.0 * c_R * c_R));
 
 	// Compute total energy in star states
 	// In 1D Riemann problem, tangential velocities (v, w) are unchanged across all waves
@@ -91,7 +99,14 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE auto HLL3R(quokka::HydroState<N_scalars, N_m
 	const double E_star_L = rho_star_L * e_star_L + 0.5 * rho_star_L * (S_star * S_star + sL.v * sL.v + sL.w * sL.w);
 	const double E_star_R = rho_star_R * e_star_R + 0.5 * rho_star_R * (S_star * S_star + sR.v * sR.v + sR.w * sR.w);
 
-	// Internal energy density in star states
+	// Auxiliary internal energy (Eint) for dual energy formalism:
+	// IMPORTANT: Eint_star must be CONSISTENT with the internal energy used in E_star!
+	// The star-state specific internal energy e_star is computed from the 3rd Riemann invariant
+	// (BKW10 Eqn. 3.2), which includes pressure work: e* = e + (P*² - P²)/(2c²).
+	// Using scalar advection jump condition (Eint* = Eint*(S-u)/(S-u*)) would be INCONSISTENT
+	// because it ignores pressure work, leading to numerical oscillations in high-Mach flows
+	// when the dual energy sync attempts to reconcile two conflicting internal energy values.
+	// Instead, we must use: Eint* = rho* * e* (internal energy density = density × specific internal energy)
 	const double Eint_star_L = rho_star_L * e_star_L;
 	const double Eint_star_R = rho_star_R * e_star_R;
 
@@ -117,27 +132,23 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE auto HLL3R(quokka::HydroState<N_scalars, N_m
 
 	// The remaining components are passive scalars, so just copy them from
 	// x1LeftState and x1RightState into the (left, right) state vectors U_L and U_R
-	// Scalars are advected with the flow: scalar* = scalar_L if S* > 0, else scalar_R
+	// Scalars must also satisfy jump condition: scalar* = scalar * (S - u) / (S - S_star)
 	for (int n = 0; n < N_scalars; ++n) {
 		const int nstart = fluxdim - N_scalars;
 		U_L[nstart + n] = sL.scalar[n];
 		U_R[nstart + n] = sR.scalar[n];
-		// Star state scalars: use upwind value based on contact velocity
-		if (S_star > 0.0) {
-			// Contact moves right, left state scalars advected to star region
-			U_star_L[nstart + n] = sL.scalar[n] * (rho_star_L / sL.rho);
-			U_star_R[nstart + n] = sL.scalar[n] * (rho_star_R / sL.rho);
-		} else {
-			// Contact moves left or stationary, right state scalars advected
-			U_star_L[nstart + n] = sR.scalar[n] * (rho_star_L / sR.rho);
-			U_star_R[nstart + n] = sR.scalar[n] * (rho_star_R / sR.rho);
-		}
+		// Star state scalars via Rankine-Hugoniot jump condition
+		// U_star_L only uses left state data through S_L wave
+		// U_star_R only uses right state data through S_R wave
+		U_star_L[nstart + n] = sL.scalar[n] * (S_L - sL.u) / (S_L - S_star);
+		U_star_R[nstart + n] = sR.scalar[n] * (S_R - sR.u) / (S_R - S_star);
 	}
 
 	// Pressure contribution vector for flux calculation
 	const quokka::valarray<double, fluxdim> D_L = {0., 1., 0., 0., sL.u, 0.};
 	const quokka::valarray<double, fluxdim> D_R = {0., 1., 0., 0., sR.u, 0.};
-	const quokka::valarray<double, fluxdim> D_star = {0., 1., 0., 0., S_star, 0.};
+	// Note: D_star is not needed in HLL3R since we compute star-state fluxes
+	// via Rankine-Hugoniot jump conditions directly from F_L/F_R and U*/U
 
 	// Physical fluxes at left and right states
 	// F = [rho*u, rho*u^2 + p, rho*u*v, rho*u*w, (E+p)*u, Eint*u]
