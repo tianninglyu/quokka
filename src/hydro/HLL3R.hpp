@@ -77,10 +77,10 @@ AMREX_FORCE_INLINE AMREX_GPU_DEVICE auto HLL3R(quokka::HydroState<N_scalars, N_m
 	// 1/rho*_R = 1/rho_R - (c_L * [u] + [p]) / (c_R * (c_L + c_R))
 	const double inv_rho_star_L = 1.0 / sL.rho + (c_R * (-dU) + dP) / (c_L * (c_L + c_R));
 	const double inv_rho_star_R = 1.0 / sR.rho - (c_L * dU + dP) / (c_R * (c_L + c_R));
-	// Protect against negative or zero density with a tiny relative floor to avoid excessive diffusion
-	constexpr double rho_rel_floor = 1.0e-12;
-	const double rho_star_L = 1.0 / std::max(inv_rho_star_L, rho_rel_floor / sL.rho);
-	const double rho_star_R = 1.0 / std::max(inv_rho_star_R, rho_rel_floor / sR.rho);
+	// Protect against negative density (set to zero if inv_rho* is too small or negative)
+	constexpr double eps = 1.0e-100;
+	const double rho_star_L = (inv_rho_star_L > eps) ? (1.0 / inv_rho_star_L) : 0.0;
+	const double rho_star_R = (inv_rho_star_R > eps) ? (1.0 / inv_rho_star_R) : 0.0;
 
 	// Compute specific internal energy in star left/right states for TOTAL ENERGY calculation
 	// BKW10, Eqn.(3.2), 3rd Riemann Invariant: e - p^2/(2c^2) = const along contact
