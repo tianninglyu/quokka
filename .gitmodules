@@ -1,25 +1,25 @@
 [submodule "src/fmt"]
 	path = extern/fmt
-	url = https://github.com/fmtlib/fmt.git
+	url = https://gitee.com/lv-tianning/fmt.git
 [submodule "extern/amrex"]
 	path = extern/amrex
-	url = https://github.com/AMReX-Codes/amrex.git
+	url = https://gitee.com/lv-tianning/amrex.git
 [submodule "extern/Microphysics"]
 	path = extern/Microphysics
-	url = https://github.com/psharda/Microphysics
+	url = https://gitee.com/lv-tianning/Microphysics.git
 	branch = development
 [submodule "extern/yaml-cpp"]
 	path = extern/yaml-cpp
-	url = https://github.com/jbeder/yaml-cpp.git
+	url = https://gitee.com/lv-tianning/yaml-cpp.git
 [submodule "extern/openPMD-api"]
 	path = extern/openPMD-api
-	url = https://github.com/openPMD/openPMD-api.git
+	url = https://gitee.com/lv-tianning/openPMD-api.git
 [submodule "extern/regression_testing"]
 	path = extern/regression_testing
-	url = https://github.com/AMReX-Codes/regression_testing.git
+	url = https://gitee.com/lv-tianning/regression_testing.git
 [submodule "extern/turbulence"]
 	path = extern/turbulence
-	url = https://github.com/chfeder/turbulence_generator.git
+	url = https://gitee.com/lv-tianning/turbulence_generator.git
 [submodule "extern/AMReX-Hydro"]
 	path = extern/AMReX-Hydro
-	url = https://github.com/AMReX-Fluids/AMReX-Hydro.git
+	url = https://gitee.com/lv-tianning/AMReX-Hydro.git
